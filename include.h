@@ -60,6 +60,8 @@ std::wstring StringToWString(const std::string& str);
 std::string WStringToString(const std::wstring& wstr);
 std::vector<PrefetchFileInfo> GetPrefetchFileInfos();
 std::string GetFileTimeString(const FILETIME& fileTime);
+std::string getOwnPath();
+std::wstring ToUpperCase(const std::wstring& str);
 
 struct GenericRule {
     std::string name;
