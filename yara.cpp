@@ -14,13 +14,8 @@ import "pe"
 rule A
 {
     strings:
-        $a = {63 00 6C 00 69 00 63 00 6B 00 65 00 72 00} // clicker
-        $b = {43 00 4C 00 49 00 43 00 4B 00 45 00 52 00} // CLICKER
-        $c = {43 00 6C 00 69 00 63 00 6B 00 65 00 72 00} // Clicker
-        $d = {61 00 75 00 74 00 6F 00 63 00 6C 00 69 00 63 00 6B 00} // autoclick
-        $e = {41 00 55 00 54 00 4F 00 43 00 4C 00 49 00 43 00 4B 00} // AUTOCLICK
-        $f = {41 00 75 00 74 00 6F 00 63 00 6C 00 69 00 63 00 6B 00} // Autoclick
-        $g = {41 00 75 00 74 00 6F 00 43 00 6C 00 69 00 63 00 6B 00} // AutoClick
+        $a = /clicker/i ascii wide
+        $b = /autoclick/i ascii wide
     condition:
         pe.is_pe and
         any of them
@@ -31,8 +26,13 @@ rule A
 rule sA
 {
     strings:
-        $a = {45 78 6F 64 75 73 2E 63 6F 64 65 73} // Exodus.codes
-        $b = {73 6C 69 6E 6B 79 2E 67 67} // slinky.gg
+        $a = /Exodus\.codes/i ascii wide
+        $b = /slinky\.gg/i ascii wide
+        $c = /slinkyhook\.dll/i ascii wide
+        $d = /slinky_library\.dll/i ascii wide
+        $e = /\[!\] Failed to find Vape jar/i ascii wide
+        $f = /\$Vape Launcher/i ascii wide
+
     condition:
         pe.is_pe and
         any of them
