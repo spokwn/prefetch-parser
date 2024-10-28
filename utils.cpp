@@ -9,6 +9,20 @@ std::string ConvertExecutedTime(long long executed_time) {
     return oss.str();
 }
 
+std::string getOwnPath() {
+    char buffer[MAX_PATH];
+    DWORD filename = GetModuleFileNameA(NULL, buffer, MAX_PATH);
+
+    return std::string(buffer, filename);
+}
+
+std::wstring ToUpperCase(const std::wstring& str) {
+    std::wstring upperStr = str;
+    std::transform(upperStr.begin(), upperStr.end(), upperStr.begin(),
+        [](wchar_t c) { return towupper(c); });
+    return upperStr;
+}
+
 std::unordered_map<std::wstring, std::wstring> GetVolumeSerialToLetterMap() {
     std::unordered_map<std::wstring, std::wstring> volumeToLetter;
 
