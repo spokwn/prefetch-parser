@@ -192,15 +192,20 @@ void ui::initialize_prefetch_data() {
                     
                     if (!info.is_signed)
                     {
-                        std::vector<std::string> matched_rules;
-                        bool yara_match = scan_with_yara(WStringToString(info.proper_path), matched_rules);
-                        if (yara_match && !matched_rules.empty()) {
-                            for (const auto& rule : matched_rules) {
-                                info.matched_rules.push_back(rule);
-                            }
+                        if (ToUpperCase(info.proper_path) == ToUpperCase(StringToWString(getOwnPath()))) {
+                            
                         }
                         else {
-                            info.matched_rules.push_back("none");
+                            std::vector<std::string> matched_rules;
+                            bool yara_match = scan_with_yara(WStringToString(info.proper_path), matched_rules);
+                            if (yara_match && !matched_rules.empty()) {
+                                for (const auto& rule : matched_rules) {
+                                    info.matched_rules.push_back(rule);
+                                }
+                            }
+                            else {
+                                info.matched_rules.push_back("none");
+                            }
                         }
                     }
                     else
