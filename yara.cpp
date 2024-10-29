@@ -7,8 +7,6 @@ void addGenericRule(const std::string& name, const std::string& rule) {
 }
 
 void initializeGenericRules() {
-
-    
     addGenericRule("Generic A", R"(
 import "pe"
 rule A
@@ -16,6 +14,12 @@ rule A
     strings:
         $a = /clicker/i ascii wide
         $b = /autoclick/i ascii wide
+        $c = /clicking/i ascii wide
+        $d = /String Cleaner/i ascii wide
+        $e = /double_click/i ascii wide
+        $f = /Jitter Click/i ascii wide
+        $g = /Butterfly Click/i ascii wide
+
     condition:
         pe.is_pe and
         any of them
@@ -31,8 +35,31 @@ rule sA
         $c = /slinkyhook\.dll/i ascii wide
         $d = /slinky_library\.dll/i ascii wide
         $e = /\[!\] Failed to find Vape jar/i ascii wide
-        $f = /\$Vape Launcher/i ascii wide
-
+        $f = /Vape Launcher/i ascii wide
+        $g = /vape\.gg/i ascii wide
+        $h = /C:\\Users\\PC\\Desktop\\Cleaner-main\\obj\\x64\\Release\\WindowsFormsApp3\.pdb/i ascii wide
+        $i = /discord\.gg\/advantages/i ascii wide
+        $j = /String cleaner/i ascii wide
+        $k = /Open Minecraft, then try again\./i ascii wide
+        $l = /The clicker code was done by Nightbot\. I skidded it :\)/i ascii wide
+        $m = /PE injector/i ascii wide
+        $n = /name="SparkCrack\.exe"/i ascii wide
+        $o = /starlight v1\.0/i ascii wide
+        $p = /Sapphire LITE Clicker/i ascii wide
+        $q = /Striker\.exe/i ascii wide
+        $r = /Cracked by Kangaroo/i ascii wide
+        $s = /Monolith Lite/i ascii wide
+        $t = /B\.fagg0t0/i ascii wide
+        $u = /B\.fag0/i ascii wide
+        $v = /\.\fag1/i ascii wide
+        $w = /dream-injector/i ascii wide
+        $x = /C:\\Users\\Daniel\\Desktop\\client-top\\x64\\Release\\top-external\.pdb/i ascii wide
+        $y = /C:\\Users\\Daniel\\Desktop\\client-top\\x64\\Release\\top-internal\.pdb/i ascii wide
+        $z = /UNICORN CLIENT/i ascii wide
+        $aa = /Adding delay to Minecraft/i ascii wide
+        $ab = /rightClickChk\.BackgroundImage/i ascii wide
+        $ac = /UwU Client/i ascii wide
+        $ad = /lithiumclient\.wtf/i ascii wide
     condition:
         pe.is_pe and
         any of them
