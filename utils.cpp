@@ -1,4 +1,5 @@
 #include "include.h"
+#include <mscat.h>
 
 std::string ConvertExecutedTime(long long executed_time) {
     std::time_t time = static_cast<std::time_t>(executed_time);
@@ -143,6 +144,86 @@ std::string GetFileTimeString(const FILETIME& fileTime) {
     return std::string(buffer);
 }
 
+static bool VerifyFileViaCatalog(LPCWSTR filePath)
+{
+    HANDLE hCatAdmin = NULL;
+    if (!CryptCATAdminAcquireContext(&hCatAdmin, NULL, 0))
+        return false;
+
+    HANDLE hFile = CreateFileW(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        CryptCATAdminReleaseContext(hCatAdmin, 0);
+        return false;
+    }
+
+    DWORD dwHashSize = 0;
+    if (!CryptCATAdminCalcHashFromFileHandle(hFile, &dwHashSize, NULL, 0))
+    {
+        CloseHandle(hFile);
+        CryptCATAdminReleaseContext(hCatAdmin, 0);
+        return false;
+    }
+
+    BYTE* pbHash = new BYTE[dwHashSize];
+    if (!CryptCATAdminCalcHashFromFileHandle(hFile, &dwHashSize, pbHash, 0))
+    {
+        delete[] pbHash;
+        CloseHandle(hFile);
+        CryptCATAdminReleaseContext(hCatAdmin, 0);
+        return false;
+    }
+
+    CloseHandle(hFile);
+
+    CATALOG_INFO catInfo = { 0 };
+    catInfo.cbStruct = sizeof(catInfo);
+
+    HANDLE hCatInfo = CryptCATAdminEnumCatalogFromHash(hCatAdmin, pbHash, dwHashSize, 0, NULL);
+    bool isCatalogSigned = false;
+
+    while (hCatInfo && CryptCATCatalogInfoFromContext(hCatInfo, &catInfo, 0))
+    {
+        WINTRUST_CATALOG_INFO wtc = {};
+        wtc.cbStruct = sizeof(wtc);
+        wtc.pcwszCatalogFilePath = catInfo.wszCatalogFile;
+        wtc.pbCalculatedFileHash = pbHash;
+        wtc.cbCalculatedFileHash = dwHashSize;
+        wtc.pcwszMemberFilePath = filePath;
+
+        WINTRUST_DATA wtd = {};
+        wtd.cbStruct = sizeof(wtd);
+        wtd.dwUnionChoice = WTD_CHOICE_CATALOG;
+        wtd.pCatalog = &wtc;
+        wtd.dwUIChoice = WTD_UI_NONE;
+        wtd.fdwRevocationChecks = WTD_REVOKE_NONE;
+        wtd.dwProvFlags = 0;
+        wtd.dwStateAction = WTD_STATEACTION_VERIFY;
+
+        GUID action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+        LONG res = WinVerifyTrust(NULL, &action, &wtd);
+
+        wtd.dwStateAction = WTD_STATEACTION_CLOSE;
+        WinVerifyTrust(NULL, &action, &wtd);
+
+        if (res == ERROR_SUCCESS)
+        {
+            isCatalogSigned = true;
+            break;
+        }
+        hCatInfo = CryptCATAdminEnumCatalogFromHash(hCatAdmin, pbHash, dwHashSize, 0, &hCatInfo);
+    }
+
+    if (hCatInfo)
+        CryptCATAdminReleaseCatalogContext(hCatAdmin, hCatInfo, 0);
+
+    CryptCATAdminReleaseContext(hCatAdmin, 0);
+    delete[] pbHash;
+
+    return isCatalogSigned;
+}
+
+
 bool IsFileSignatureValid(const std::wstring& filePath) {
     
     WINTRUST_FILE_INFO fileInfo;
@@ -165,6 +246,9 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
 
     if (lStatus != ERROR_SUCCESS) {
         isValid = false; // not signed
+        if (VerifyFileViaCatalog(filePath.c_str())) {
+            isValid = true;
+        }
     }
     else {
         CRYPT_PROVIDER_DATA const* psProvData = WTHelperProvDataFromStateData(winTrustData.hWVTStateData);
@@ -192,8 +276,9 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
                 }
             }
         }
+        
     }
-
+    
     // Cleanup
     winTrustData.dwStateAction = WTD_STATEACTION_CLOSE;
     WinVerifyTrust(NULL, &guidAction, &winTrustData);
