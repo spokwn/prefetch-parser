@@ -225,7 +225,7 @@ static bool VerifyFileViaCatalog(LPCWSTR filePath)
 
 
 bool IsFileSignatureValid(const std::wstring& filePath) {
-    
+
     WINTRUST_FILE_INFO fileInfo;
     ZeroMemory(&fileInfo, sizeof(fileInfo));
     fileInfo.cbStruct = sizeof(WINTRUST_FILE_INFO);
@@ -241,16 +241,10 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
     winTrustData.dwStateAction = WTD_STATEACTION_VERIFY;
     winTrustData.pFile = &fileInfo;
 
-    LONG lStatus = WinVerifyTrust(NULL, &guidAction, &winTrustData);
+    LONG lStatus = WinVerifyTrust(nullptr, &guidAction, &winTrustData);
     bool isValid = true;
 
-    if (lStatus != ERROR_SUCCESS) {
-        isValid = false; // not signed
-        if (VerifyFileViaCatalog(filePath.c_str())) {
-            isValid = true;
-        }
-    }
-    else {
+    if (lStatus == ERROR_SUCCESS) {
         CRYPT_PROVIDER_DATA const* psProvData = WTHelperProvDataFromStateData(winTrustData.hWVTStateData);
         if (psProvData) {
             CRYPT_PROVIDER_DATA* nonConstProvData = const_cast<CRYPT_PROVIDER_DATA*>(psProvData);
@@ -258,33 +252,75 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
             if (pProvSigner) {
                 CRYPT_PROVIDER_CERT* pProvCert = WTHelperGetProvCertFromChain(pProvSigner, 0);
                 if (pProvCert && pProvCert->pCert) {
-                    char subjectName[256];
-                    CertNameToStrA(pProvCert->pCert->dwCertEncodingType,
+                    char subjectName[256] = { 0 };
+                    CertNameToStrA(
+                        pProvCert->pCert->dwCertEncodingType,
                         &pProvCert->pCert->pCertInfo->Subject,
                         CERT_X500_NAME_STR,
                         subjectName,
-                        sizeof(subjectName));
+                        sizeof(subjectName)
+                    );
 
                     std::string subject(subjectName);
                     std::transform(subject.begin(), subject.end(), subject.begin(), ::tolower);
 
-                    // vape or slinky check
                     if (subject.find("manthe industries, llc") != std::string::npos ||
                         subject.find("slinkware") != std::string::npos) {
                         isValid = false;
                     }
+
+                    PCCERT_CONTEXT pCert = pProvCert->pCert;
+                    DWORD hashSize = 0;
+                    if (CertGetCertificateContextProperty(pCert, CERT_SHA1_HASH_PROP_ID, nullptr, &hashSize)) {
+                        std::vector<BYTE> hash(hashSize);
+                        if (CertGetCertificateContextProperty(pCert, CERT_SHA1_HASH_PROP_ID, hash.data(), &hashSize)) {
+                            CRYPT_HASH_BLOB hashBlob;
+                            hashBlob.cbData = hashSize;
+                            hashBlob.pbData = hash.data();
+
+                            HCERTSTORE hStore = CertOpenStore(
+                                CERT_STORE_PROV_SYSTEM_W,
+                                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                NULL,
+                                CERT_SYSTEM_STORE_CURRENT_USER | CERT_STORE_OPEN_EXISTING_FLAG,
+                                L"Root"
+                            );
+
+                            if (hStore) {
+                                PCCERT_CONTEXT foundCert = CertFindCertificateInStore(
+                                    hStore,
+                                    pCert->dwCertEncodingType,
+                                    0,
+                                    CERT_FIND_SHA1_HASH,
+                                    &hashBlob,
+                                    NULL
+                                );
+
+                                if (foundCert) {
+                                    isValid = false;
+                                    CertFreeCertificateContext(foundCert);
+                                }
+                                CertCloseStore(hStore, 0);
+                            }
+                        }
+                    }
                 }
             }
         }
-        
     }
-    
-    // Cleanup
+    else {
+        isValid = false;
+        if (VerifyFileViaCatalog(filePath.c_str())) {
+            isValid = true;
+        }
+    }
+
     winTrustData.dwStateAction = WTD_STATEACTION_CLOSE;
-    WinVerifyTrust(NULL, &guidAction, &winTrustData);
+    WinVerifyTrust(nullptr, &guidAction, &winTrustData);
 
     return isValid;
 }
+
 
 std::wstring StringToWString(const std::string& str) {
     if (str.empty())
