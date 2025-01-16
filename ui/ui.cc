@@ -75,44 +75,35 @@ public:
     }
 
     static bool isInInstance(const std::string& execTime) {
-        auto sessions = GetInteractiveLogonSessions();
-        if (sessions.empty()) {
-            return false;
-        }
-
-        auto oldestSession = std::min_element(sessions.begin(), sessions.end(),
-            [](const LogonSessionInfo& a, const LogonSessionInfo& b) {
-                return CompareFileTime(&a.logonTime, &b.logonTime) < 0;
-            });
-
-        SYSTEMTIME currentSysTime;
-        GetLocalTime(&currentSysTime);
-        FILETIME currentTime;
-        SystemTimeToFileTime(&currentSysTime, &currentTime);
-
-        if (!isValidFormat(execTime)) return false;
-
-        std::tm tm = {};
-        std::istringstream ss(execTime);
-        ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-
-        SYSTEMTIME execSt = {
-            (WORD)(tm.tm_year + 1900),
-            (WORD)(tm.tm_mon + 1),
-            (WORD)tm.tm_wday,
-            (WORD)tm.tm_mday,
-            (WORD)tm.tm_hour,
-            (WORD)tm.tm_min,
-            (WORD)tm.tm_sec,
-            0
-        };
-
-        FILETIME execFt;
-        SystemTimeToFileTime(&execSt, &execFt);
-
-        return (CompareFileTime(&execFt, &oldestSession->logonTime) >= 0 &&
-            CompareFileTime(&execFt, &currentTime) <= 0);
+    if (!isValidFormat(execTime)) return false;
+    auto sessions = GetInteractiveLogonSessions();
+    if (sessions.empty()) {
+        return false;
     }
+    const LogonSessionInfo& firstSession = sessions.front();
+    SYSTEMTIME utcCurrentSysTime;
+    GetSystemTime(&utcCurrentSysTime);
+    FILETIME currentTime;
+    SystemTimeToFileTime(&utcCurrentSysTime, &currentTime);
+    std::tm tm = {};
+    std::istringstream ss(execTime);
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    SYSTEMTIME execSt = {
+        (WORD)(tm.tm_year + 1900),
+        (WORD)(tm.tm_mon + 1),
+        (WORD)tm.tm_wday,
+        (WORD)tm.tm_mday,
+        (WORD)tm.tm_hour,
+        (WORD)tm.tm_min,
+        (WORD)tm.tm_sec,
+        0
+    };
+    FILETIME execFt;
+    SystemTimeToFileTime(&execSt, &execFt);
+    return (CompareFileTime(&execFt, &firstSession.logonTime) >= 0 &&
+            CompareFileTime(&execFt, &currentTime) <= 0);
+}
+
 };
 
 void CopyableText(const char* label)
