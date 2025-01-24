@@ -87,7 +87,6 @@ std::unordered_map<std::wstring, std::wstring> GetVolumeSerialToLetterMap() {
                 std::wstring serialNum = vtProp1.bstrVal;
                 std::wstring driveLetter = vtProp2.bstrVal;
 
-                // Convert serial to uppercase for case-insensitive comparison
                 std::transform(serialNum.begin(), serialNum.end(), serialNum.begin(), ::toupper);
 
                 volumeToLetter[serialNum] = driveLetter;
@@ -143,6 +142,7 @@ std::string GetFileTimeString(const FILETIME& fileTime) {
         systemTime.wHour, systemTime.wMinute, systemTime.wSecond);
     return std::string(buffer);
 }
+
 
 static bool VerifyFileViaCatalog(LPCWSTR filePath)
 {
@@ -224,6 +224,7 @@ static bool VerifyFileViaCatalog(LPCWSTR filePath)
 }
 
 
+
 bool IsFileSignatureValid(const std::wstring& filePath) {
 
     WINTRUST_FILE_INFO fileInfo;
@@ -265,7 +266,8 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
                     std::transform(subject.begin(), subject.end(), subject.begin(), ::tolower);
 
                     if (subject.find("manthe industries, llc") != std::string::npos ||
-                        subject.find("slinkware") != std::string::npos) {
+                        subject.find("slinkware") != std::string::npos              ||
+                        subject.find("amstion limited") != std::string::npos) {
                         isValid = false;
                     }
 
@@ -320,6 +322,9 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
 
     return isValid;
 }
+
+
+
 
 
 std::wstring StringToWString(const std::string& str) {
