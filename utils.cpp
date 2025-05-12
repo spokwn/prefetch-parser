@@ -226,7 +226,6 @@ static bool VerifyFileViaCatalog(LPCWSTR filePath)
 
 
 bool IsFileSignatureValid(const std::wstring& filePath) {
-
     WINTRUST_FILE_INFO fileInfo;
     ZeroMemory(&fileInfo, sizeof(fileInfo));
     fileInfo.cbStruct = sizeof(WINTRUST_FILE_INFO);
@@ -242,10 +241,10 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
     winTrustData.dwStateAction = WTD_STATEACTION_VERIFY;
     winTrustData.pFile = &fileInfo;
 
-    LONG lStatus = WinVerifyTrust(nullptr, &guidAction, &winTrustData);
+    LONG status = WinVerifyTrust(nullptr, &guidAction, &winTrustData);
     bool isValid = true;
 
-    if (lStatus == ERROR_SUCCESS) {
+    if (status == ERROR_SUCCESS) {
         CRYPT_PROVIDER_DATA const* psProvData = WTHelperProvDataFromStateData(winTrustData.hWVTStateData);
         if (psProvData) {
             CRYPT_PROVIDER_DATA* nonConstProvData = const_cast<CRYPT_PROVIDER_DATA*>(psProvData);
@@ -253,7 +252,7 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
             if (pProvSigner) {
                 CRYPT_PROVIDER_CERT* pProvCert = WTHelperGetProvCertFromChain(pProvSigner, 0);
                 if (pProvCert && pProvCert->pCert) {
-                    char subjectName[256] = { 0 };
+                    char subjectName[256] = {};
                     CertNameToStrA(
                         pProvCert->pCert->dwCertEncodingType,
                         &pProvCert->pCert->pCertInfo->Subject,
@@ -261,14 +260,20 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
                         subjectName,
                         sizeof(subjectName)
                     );
-
                     std::string subject(subjectName);
                     std::transform(subject.begin(), subject.end(), subject.begin(), ::tolower);
-
-                    if (subject.find("manthe industries, llc") != std::string::npos ||
-                        subject.find("slinkware") != std::string::npos              ||
-                        subject.find("amstion limited") != std::string::npos) {
-                        isValid = false;
+                    static const char* cheats[] = {
+                        "manthe industries, llc",
+                        "slinkware",
+                        "amstion limited",
+                        "newfakeco",
+                        "faked signatures inc"
+                    };
+                    for (auto& c : cheats) {
+                        if (subject.find(c) != std::string::npos) {
+                            isValid = false;
+                            break;
+                        }
                     }
 
                     PCCERT_CONTEXT pCert = pProvCert->pCert;
@@ -276,41 +281,50 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
                     if (CertGetCertificateContextProperty(pCert, CERT_SHA1_HASH_PROP_ID, nullptr, &hashSize)) {
                         std::vector<BYTE> hash(hashSize);
                         if (CertGetCertificateContextProperty(pCert, CERT_SHA1_HASH_PROP_ID, hash.data(), &hashSize)) {
-                            CRYPT_HASH_BLOB hashBlob;
-                            hashBlob.cbData = hashSize;
-                            hashBlob.pbData = hash.data();
-
-                            HCERTSTORE hStore = CertOpenStore(
-                                CERT_STORE_PROV_SYSTEM_W,
-                                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                                NULL,
+                            CRYPT_HASH_BLOB hashBlob{ hashSize, hash.data() };
+                            static const LPCWSTR storeNames[] = {
+                                L"MY", L"Root", L"Trust", L"CA", L"UserDS",
+                                L"TrustedPublisher", L"Disallowed", L"AuthRoot",
+                                L"TrustedPeople", L"ClientAuthIssuer",
+                                L"CertificateEnrollment", L"SmartCardRoot"
+                            };
+                            const DWORD contexts[] = {
                                 CERT_SYSTEM_STORE_CURRENT_USER | CERT_STORE_OPEN_EXISTING_FLAG,
-                                L"Root"
-                            );
-
-                            if (hStore) {
-                                PCCERT_CONTEXT foundCert = CertFindCertificateInStore(
-                                    hStore,
-                                    pCert->dwCertEncodingType,
-                                    0,
-                                    CERT_FIND_SHA1_HASH,
-                                    &hashBlob,
-                                    NULL
-                                );
-
-                                if (foundCert) {
-                                    isValid = false;
-                                    CertFreeCertificateContext(foundCert);
+                                CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_OPEN_EXISTING_FLAG
+                            };
+                            for (auto ctx : contexts) {
+                                for (auto& name : storeNames) {
+                                    HCERTSTORE hStore = CertOpenStore(
+                                        CERT_STORE_PROV_SYSTEM_W,
+                                        X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                        NULL,
+                                        ctx,
+                                        name
+                                    );
+                                    if (!hStore) continue;
+                                    PCCERT_CONTEXT found = CertFindCertificateInStore(
+                                        hStore,
+                                        pCert->dwCertEncodingType,
+                                        0,
+                                        CERT_FIND_SHA1_HASH,
+                                        &hashBlob,
+                                        NULL
+                                    );
+                                    if (found) {
+                                        isValid = false;
+                                        CertFreeCertificateContext(found);
+                                    }
+                                    CertCloseStore(hStore, 0);
+                                    if (!isValid) break;
                                 }
-                                CertCloseStore(hStore, 0);
+                                if (!isValid) break;
                             }
                         }
                     }
                 }
             }
         }
-    }
-    else {
+    } else {
         isValid = false;
         if (VerifyFileViaCatalog(filePath.c_str())) {
             isValid = true;
@@ -322,6 +336,7 @@ bool IsFileSignatureValid(const std::wstring& filePath) {
 
     return isValid;
 }
+
 
 
 
